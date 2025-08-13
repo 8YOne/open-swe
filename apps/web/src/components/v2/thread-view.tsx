@@ -589,6 +589,23 @@ export function ThreadView({
           isOpen={isTaskSidebarOpen}
           onClose={() => setIsTaskSidebarOpen(false)}
           taskPlan={programmerTaskPlan}
+          currentUser={user?.login || user?.name || undefined}
+          onUpdateTaskPlan={async (next) => {
+            if (!programmerSession?.threadId) return;
+            try {
+              await programmerStream.client.threads.updateState(
+                programmerSession.threadId,
+                {
+                  values: {
+                    taskPlan: next,
+                  },
+                },
+              );
+              setProgrammerTaskPlan(next);
+            } catch (err) {
+              console.error("Failed to update task plan", err);
+            }
+          }}
         />
       )}
     </div>

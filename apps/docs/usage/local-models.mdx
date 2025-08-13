@@ -1,0 +1,23 @@
+## Local/Open-Source Models
+
+Open SWE now supports local models via Ollama and OpenAI-compatible endpoints.
+
+### Ollama
+
+1. Install Ollama and pull a model, e.g.:
+
+```bash
+brew install ollama
+ollama pull llama3.1
+```
+
+2. In Settings → Configuration, set `programmerModelName`, `plannerModelName`, etc. to `ollama:llama3.1` and ensure `ollamaBaseUrl` points to your server (default `http://localhost:11434`).
+
+### OpenAI-compatible endpoints
+
+If you proxy to an OpenAI-compatible API (e.g. local gateway), set `openaiBaseUrl` in Settings → Configuration. Then use an `openai:*` model id.
+
+Notes
+- Ollama does not require an API key.
+- The agent will use provider-specific defaults when not configured.
+

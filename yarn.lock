@@ -4241,6 +4241,7 @@ __metadata:
     "@radix-ui/react-tabs": ^1.1.12
     "@radix-ui/react-tooltip": ^1.1.8
     "@tailwindcss/postcss": ^4.0.13
+    "@types/bcryptjs": ^2.4.6
     "@types/jsonwebtoken": ^9.0.10
     "@types/lodash": ^4.17.16
     "@types/node": ^22.13.5
@@ -4249,6 +4250,7 @@ __metadata:
     "@types/react-syntax-highlighter": ^15.5.13
     "@types/uuid": ^10.0.0
     autoprefixer: ^10.4.20
+    bcryptjs: ^2.4.3
     class-variance-authority: ^0.7.1
     clsx: ^2.1.1
     cmdk: ^1.1.1
@@ -4283,6 +4285,7 @@ __metadata:
     remark-math: ^6.0.0
     shadcn: ^2.6.1
     sonner: ^2.0.1
+    sql.js: ^1.13.0
     swr: ^2.3.4
     tailwind-merge: ^3.0.2
     tailwind-scrollbar: ^4.0.1
@@ -6708,6 +6711,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/bcryptjs@npm:^2.4.6":
+  version: 2.4.6
+  resolution: "@types/bcryptjs@npm:2.4.6"
+  checksum: 25ae1fd1e8a9bd688e22a8de905581d6d7bf26e823b797f895d2c488100b1f15d3c12a7d1a94f553087b010d316bf3978106df860e8e58fd13f52b4c708df5fd
+  languageName: node
+  linkType: hard
+
 "@types/chai@npm:^5.2.2":
   version: 5.2.2
   resolution: "@types/chai@npm:5.2.2"
@@ -8346,6 +8356,13 @@ __metadata:
     node-gyp: latest
     node-gyp-build: ^4.8.4
   checksum: 004e1920fab7a7183b15467257f3010b45f5db73ad91448fb108c9070dfe56c4e35cb16e12987dd88b9e03b997f08a6070494802cb5fd2a90e1664279ab8aef5
+  languageName: node
+  linkType: hard
+
+"bcryptjs@npm:^2.4.3":
+  version: 2.4.3
+  resolution: "bcryptjs@npm:2.4.3"
+  checksum: 0e80ed852a41f5dfb1853f53ee14a7390b0ef263ce05dba6e2ef3cd919dfad025a7c21ebcfe5bc7fa04b100990edf90c7a877ff7fe623d3e479753253131b629
   languageName: node
   linkType: hard
 
@@ -18781,6 +18798,13 @@ __metadata:
   version: 1.0.3
   resolution: "sprintf-js@npm:1.0.3"
   checksum: 19d79aec211f09b99ec3099b5b2ae2f6e9cdefe50bc91ac4c69144b6d3928a640bb6ae5b3def70c2e85a2c3d9f5ec2719921e3a59d3ca3ef4b2fd1a4656a0df3
+  languageName: node
+  linkType: hard
+
+"sql.js@npm:^1.13.0":
+  version: 1.13.0
+  resolution: "sql.js@npm:1.13.0"
+  checksum: ea74dc129ed0a6c77ce9a767c66f38aceba62e0b3950d8edc93790c5098688b133f34e6df7b67912a812d277735c2127935b9f783ca45b91f618fcd9c2ce5061
   languageName: node
   linkType: hard
 

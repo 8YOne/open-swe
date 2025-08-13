@@ -8,6 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const response = NextResponse.json({ success: true });
     clearGitHubToken(response);
+    response.cookies.delete("local_auth_token");
     return response;
   } catch (error) {
     console.error("Error during logout:", error);

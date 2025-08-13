@@ -66,6 +66,23 @@ function AuthStatusContent() {
     window.location.href = "/api/auth/github/login";
   };
 
+  const handleLocalLogin = async () => {
+    setIsLoading(true);
+    const username = prompt("Username");
+    const password = prompt("Password");
+    if (!username || !password) {
+      setIsLoading(false);
+      return;
+    }
+    const res = await fetch("/api/auth/local/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    setIsLoading(false);
+    if (res.ok) router.push("/chat");
+  };
+
   const handleInstallGitHubApp = () => {
     setIsLoading(true);
     window.location.href = "/api/github/installation";
@@ -93,9 +110,7 @@ function AuthStatusContent() {
                 Get started
               </h1>
             </div>
-            <p className="text-muted-foreground">
-              Connect your GitHub account to get started with Open SWE.
-            </p>
+            <p className="text-muted-foreground">Choose a sign-in method.</p>
             <Button
               onClick={handleLogin}
               disabled={isLoading}
@@ -104,7 +119,10 @@ function AuthStatusContent() {
                 width="16"
                 height="16"
               />
-              {isLoading ? "Connecting..." : "Connect GitHub"}
+              {isLoading ? "Connecting..." : "Sign in with GitHub"}
+            </Button>
+            <Button onClick={handleLocalLogin} disabled={isLoading} variant="outline">
+              Local Login
             </Button>
           </div>
         </div>

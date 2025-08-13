@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Collapsible,
   CollapsibleContent,
@@ -25,17 +27,54 @@ import { ProgressBar } from "./progress-bar";
 import { PlanItem, TaskPlan } from "@open-swe/shared/open-swe/types";
 import { BasicMarkdownText } from "../thread/markdown-text";
 
+function CommentComposer({
+  currentUser,
+  onSubmit,
+}: {
+  currentUser?: string;
+  onSubmit: (text: string) => void;
+}) {
+  const [text, setText] = useState("");
+  return (
+    <div className="flex items-start gap-2">
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={
+          currentUser ? `Comment as ${currentUser}` : "Add a comment..."
+        }
+        className="min-h-[60px]"
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          onSubmit(text);
+          setText("");
+        }}
+        disabled={!text.trim()}
+      >
+        Add
+      </Button>
+    </div>
+  );
+}
+
 interface TasksSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   taskPlan: TaskPlan;
   className?: string;
   onTaskChange?: (taskId: string) => void;
+  onUpdateTaskPlan?: (next: TaskPlan) => Promise<void> | void;
+  currentUser?: string;
 }
 
 interface TaskPlanViewProps {
   taskPlan: TaskPlan;
   onTaskChange?: (taskId: string) => void;
+  onUpdateTaskPlan?: (next: TaskPlan) => Promise<void> | void;
+  currentUser?: string;
 }
 
 type FilterType = "all" | "completed" | "current" | "pending";
@@ -46,6 +85,8 @@ export function TasksSidebar({
   onClose,
   taskPlan,
   onTaskChange,
+  onUpdateTaskPlan,
+  currentUser,
 }: TasksSidebarProps) {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(
     taskPlan.activeTaskIndex,
@@ -298,6 +339,100 @@ export function TasksSidebar({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Collaboration controls for current task */}
+          <div className="mb-4 space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Assignees (comma-separated)
+              </label>
+              <Input
+                value={(currentTask.assignees || []).join(", ")}
+                onChange={(e) => {
+                  const nextAssignees = e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                  const next = {
+                    ...taskPlan,
+                    tasks: taskPlan.tasks.map((t, idx) =>
+                      idx === currentTaskIndex ? { ...t, assignees: nextAssignees } : t,
+                    ),
+                  };
+                  onUpdateTaskPlan?.(next);
+                }}
+                placeholder="alice, bob"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Labels (comma-separated)
+              </label>
+              <Input
+                value={(currentTask.labels || []).join(", ")}
+                onChange={(e) => {
+                  const nextLabels = e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                  const next = {
+                    ...taskPlan,
+                    tasks: taskPlan.tasks.map((t, idx) =>
+                      idx === currentTaskIndex ? { ...t, labels: nextLabels } : t,
+                    ),
+                  };
+                  onUpdateTaskPlan?.(next);
+                }}
+                placeholder="priority, frontend"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Add Comment
+              </label>
+              <CommentComposer
+                currentUser={currentUser}
+                onSubmit={(text) => {
+                  if (!text.trim()) return;
+                  const newComment = {
+                    id: crypto.randomUUID(),
+                    author: currentUser || "anonymous",
+                    createdAt: Date.now(),
+                    text,
+                  };
+                  const next = {
+                    ...taskPlan,
+                    tasks: taskPlan.tasks.map((t, idx) =>
+                      idx === currentTaskIndex
+                        ? { ...t, comments: [...(t.comments || []), newComment] }
+                        : t,
+                    ),
+                  };
+                  onUpdateTaskPlan?.(next);
+                }}
+              />
+              {(currentTask.comments || []).length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {(currentTask.comments || [])
+                    .slice()
+                    .sort((a, b) => a.createdAt - b.createdAt)
+                    .map((c) => (
+                      <div
+                        key={c.id}
+                        className="rounded-md border border-gray-200 p-2 text-xs dark:border-gray-700"
+                      >
+                        <div className="mb-1 text-[10px] text-gray-500 dark:text-gray-400">
+                          {c.author} · {formatDate(c.createdAt)}
+                        </div>
+                        <div className="whitespace-pre-line text-gray-800 dark:text-gray-200">
+                          {c.text}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="space-y-3">
             {filteredItems.length === 0 ? (
               <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -436,6 +571,8 @@ export function TaskPlanView({ taskPlan, onTaskChange }: TaskPlanViewProps) {
         onClose={() => setIsSidebarOpen(false)}
         taskPlan={taskPlan}
         onTaskChange={onTaskChange}
+        onUpdateTaskPlan={undefined}
+        currentUser={undefined}
       />
     </>
   );

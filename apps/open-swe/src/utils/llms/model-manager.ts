@@ -47,6 +47,7 @@ export const PROVIDER_FALLBACK_ORDER = [
   "openai",
   "anthropic",
   "google-genai",
+  "ollama",
 ] as const;
 export type Provider = (typeof PROVIDER_FALLBACK_ORDER)[number];
 
@@ -82,6 +83,9 @@ const providerToApiKey = (
       return apiKeys.anthropicApiKey;
     case "google-genai":
       return apiKeys.googleApiKey;
+    case "ollama":
+      // Ollama does not require an API key
+      return "";
     default:
       throw new Error(`Unknown provider: ${providerName}`);
   }
@@ -124,6 +128,11 @@ export class ModelManager {
     }
     if (!userLogin) {
       throw new Error("User login not found in config");
+    }
+
+    // Providers that don't require API keys
+    if (provider === "ollama") {
+      return null;
     }
 
     // If the user is allowed, we can return early
@@ -178,10 +187,24 @@ export class ModelManager {
 
     const apiKey = this.getUserApiKey(graphConfig, provider);
 
-    const modelOptions: InitChatModelArgs = {
+    // Provider-specific base URLs
+    const openaiBaseUrl =
+      ((graphConfig.configurable as any)?.openaiBaseUrl as string | undefined) ??
+      process.env.OPENAI_BASE_URL ?? undefined;
+    const ollamaBaseUrl =
+      ((graphConfig.configurable as any)?.ollamaBaseUrl as string | undefined) ??
+      process.env.OLLAMA_BASE_URL ?? undefined;
+
+    const modelOptions: InitChatModelArgs & { baseUrl?: string } = {
       modelProvider: provider,
       max_retries: MAX_RETRIES,
       ...(apiKey ? { apiKey } : {}),
+      ...(provider === "openai" && openaiBaseUrl
+        ? { baseUrl: openaiBaseUrl }
+        : {}),
+      ...(provider === "ollama" && (ollamaBaseUrl ?? "http://localhost:11434")
+        ? { baseUrl: ollamaBaseUrl ?? "http://localhost:11434" }
+        : {}),
       ...(thinkingModel && provider === "anthropic"
         ? {
             thinking: { budget_tokens: thinkingBudgetTokens, type: "enabled" },
@@ -398,6 +421,13 @@ export class ModelManager {
         [LLMTask.REVIEWER]: "gpt-5",
         [LLMTask.ROUTER]: "gpt-5-nano",
         [LLMTask.SUMMARIZER]: "gpt-5-mini",
+      },
+      ollama: {
+        [LLMTask.PLANNER]: "llama3.1",
+        [LLMTask.PROGRAMMER]: "llama3.1",
+        [LLMTask.REVIEWER]: "llama3.1",
+        [LLMTask.ROUTER]: "llama3.1",
+        [LLMTask.SUMMARIZER]: "llama3.1",
       },
     };
 

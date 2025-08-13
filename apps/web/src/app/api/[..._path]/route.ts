@@ -6,6 +6,7 @@ import {
   GITHUB_INSTALLATION_NAME,
   GITHUB_INSTALLATION_ID,
 } from "@open-swe/shared/constants";
+import { LOCAL_MODE_HEADER } from "@open-swe/shared/constants";
 import {
   getGitHubInstallationTokenOrThrow,
   getInstallationNameFromReq,
@@ -49,6 +50,16 @@ export const { GET, POST, PUT, PATCH, DELETE, OPTIONS, runtime } =
       return body;
     },
     headers: async (req) => {
+      // Local/offline mode: skip GitHub requirements and use simple auth
+      if (process.env.OPEN_SWE_LOCAL_MODE === "true") {
+        const headers: Record<string, string> = { [LOCAL_MODE_HEADER]: "true" };
+        const bearer = process.env.API_BEARER_TOKEN;
+        if (bearer && bearer.trim() !== "") {
+          headers["authorization"] = `Bearer ${bearer}`;
+        }
+        return headers;
+      }
+
       const encryptionKey = process.env.SECRETS_ENCRYPTION_KEY;
       if (!encryptionKey) {
         throw new Error(

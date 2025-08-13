@@ -84,6 +84,19 @@ export const MODEL_OPTIONS = [
     label: "Gemini 2.5 Flash",
     value: "google-genai:gemini-2.5-flash",
   },
+  // Open-source/local (Ollama)
+  {
+    label: "Llama 3.1 (Ollama)",
+    value: "ollama:llama3.1",
+  },
+  {
+    label: "Qwen2.5 Coder (Ollama)",
+    value: "ollama:qwen2.5-coder",
+  },
+  {
+    label: "Phi-4 (Ollama)",
+    value: "ollama:phi4",
+  },
 ];
 
 export const MODEL_OPTIONS_NO_THINKING = MODEL_OPTIONS.filter(

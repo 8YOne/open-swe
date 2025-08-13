@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { PlanItem, Task, TaskPlan, PlanRevision } from "./types.js";
+import { PlanItem, Task, TaskPlan, PlanRevision, TaskComment } from "./types.js";
 
 /**
  * Creates a new task with the provided plan items.
@@ -42,6 +42,9 @@ export function createNewTask(
     planRevisions: [initialRevision],
     activeRevisionIndex: 0,
     parentTaskId,
+    assignees: [],
+    labels: [],
+    comments: [],
   };
 
   // If there's an existing task plan, add the new task to it
@@ -327,4 +330,54 @@ export function completeTask(
     ...taskPlan,
     tasks: updatedTasks,
   };
+}
+
+export function setTaskAssignees(
+  taskPlan: TaskPlan,
+  taskId: string,
+  assignees: string[],
+): TaskPlan {
+  const taskIndex = taskPlan.tasks.findIndex((t) => t.id === taskId);
+  if (taskIndex === -1) throw new Error(`Task ${taskId} not found`);
+  const updatedTask: Task = { ...taskPlan.tasks[taskIndex], assignees };
+  const tasks = [...taskPlan.tasks];
+  tasks[taskIndex] = updatedTask;
+  return { ...taskPlan, tasks };
+}
+
+export function setTaskLabels(
+  taskPlan: TaskPlan,
+  taskId: string,
+  labels: string[],
+): TaskPlan {
+  const taskIndex = taskPlan.tasks.findIndex((t) => t.id === taskId);
+  if (taskIndex === -1) throw new Error(`Task ${taskId} not found`);
+  const updatedTask: Task = { ...taskPlan.tasks[taskIndex], labels };
+  const tasks = [...taskPlan.tasks];
+  tasks[taskIndex] = updatedTask;
+  return { ...taskPlan, tasks };
+}
+
+export function addTaskComment(
+  taskPlan: TaskPlan,
+  taskId: string,
+  author: string,
+  text: string,
+  parentCommentId?: string,
+): TaskPlan {
+  const taskIndex = taskPlan.tasks.findIndex((t) => t.id === taskId);
+  if (taskIndex === -1) throw new Error(`Task ${taskId} not found`);
+  const existing = taskPlan.tasks[taskIndex];
+  const newComment: TaskComment = {
+    id: uuidv4(),
+    author,
+    createdAt: Date.now(),
+    text,
+    ...(parentCommentId ? { parentCommentId } : {}),
+  };
+  const comments = [...(existing.comments ?? []), newComment];
+  const updatedTask: Task = { ...existing, comments };
+  const tasks = [...taskPlan.tasks];
+  tasks[taskIndex] = updatedTask;
+  return { ...taskPlan, tasks };
 }

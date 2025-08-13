@@ -132,6 +132,26 @@ export type Task = {
    * The pull request number associated with this task
    */
   pullRequestNumber?: number;
+  /**
+   * GitHub logins or emails of assignees
+   */
+  assignees?: string[];
+  /**
+   * Arbitrary task labels/tags
+   */
+  labels?: string[];
+  /**
+   * Freeform comments on a task
+   */
+  comments?: TaskComment[];
+};
+
+export type TaskComment = {
+  id: string;
+  author: string;
+  createdAt: number;
+  text: string;
+  parentCommentId?: string;
 };
 
 export type TaskPlan = {
@@ -412,6 +432,26 @@ export const GraphConfigurationMetadata: {
       description: "Controls randomness (0 = deterministic, 2 = creative)",
     },
   },
+  // Base URL for OpenAI-compatible endpoints
+  openaiBaseUrl: {
+    x_open_swe_ui_config: {
+      type: "text",
+      default: "",
+      description:
+        "Optional. Custom base URL for OpenAI-compatible servers (e.g., local proxy). Leave empty to use provider default.",
+      placeholder: "http://localhost:8080/v1",
+    },
+  },
+  // Base URL for Ollama (local open-source models)
+  ollamaBaseUrl: {
+    x_open_swe_ui_config: {
+      type: "text",
+      default: "http://localhost:11434",
+      description:
+        "Ollama server base URL for running local models. Defaults to http://localhost:11434.",
+      placeholder: "http://localhost:11434",
+    },
+  },
   summarizerModelName: {
     x_open_swe_ui_config: {
       type: "select",
@@ -591,6 +631,19 @@ export const GraphConfiguration = z.object({
    */
   routerTemperature: withLangGraph(z.number().optional(), {
     metadata: GraphConfigurationMetadata.routerTemperature,
+  }),
+
+  /**
+   * Optional custom base URL for OpenAI-compatible APIs
+   */
+  openaiBaseUrl: withLangGraph(z.string().optional(), {
+    metadata: GraphConfigurationMetadata.openaiBaseUrl,
+  }),
+  /**
+   * Base URL for Ollama server
+   */
+  ollamaBaseUrl: withLangGraph(z.string().optional(), {
+    metadata: GraphConfigurationMetadata.ollamaBaseUrl,
   }),
 
   /**
