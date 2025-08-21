@@ -14,7 +14,7 @@ import {
 } from "../../../utils/github/git.js";
 import {
   createPullRequest,
-  markPullRequestReadyForReview,
+  updatePullRequest,
 } from "../../../utils/github/api.js";
 import { createLogger, LogLevel } from "../../../utils/logger.js";
 import { z } from "zod";
@@ -44,6 +44,8 @@ import {
   GitHubPullRequestUpdate,
 } from "../../../utils/github/types.js";
 import { getRepoAbsolutePath } from "@open-swe/shared/git";
+import { GITHUB_USER_LOGIN_HEADER } from "@open-swe/shared/constants";
+import { shouldCreateIssue } from "../../../utils/should-create-issue.js";
 
 const logger = createLogger(LogLevel.INFO, "Open PR");
 
@@ -111,10 +113,27 @@ export async function openPullRequest(
     );
   }
 
+  const repoPath = getRepoAbsolutePath(state.targetRepository);
+
+  // First, verify that there are changed files
+  const gitDiffRes = await sandbox.process.executeCommand(
+    `git diff --name-only ${state.targetRepository.branch ?? ""}`,
+    repoPath,
+  );
+  if (gitDiffRes.exitCode !== 0 || gitDiffRes.result.trim().length === 0) {
+    // no changed files
+    const sandboxDeleted = await deleteSandbox(sandboxSessionId);
+    return {
+      ...(sandboxDeleted && {
+        sandboxSessionId: undefined,
+        dependenciesInstalled: false,
+      }),
+    };
+  }
+
   let branchName = state.branchName;
   let updatedTaskPlan: TaskPlan | undefined;
 
-  const repoPath = getRepoAbsolutePath(state.targetRepository);
   const changedFiles = await getChangedFilesStatus(repoPath, sandbox, config);
 
   if (changedFiles.length > 0) {
@@ -180,6 +199,8 @@ export async function openPullRequest(
 
   const { title, body } = toolCall.args as z.infer<typeof openPrTool.schema>;
 
+  const userLogin = config.configurable?.[GITHUB_USER_LOGIN_HEADER];
+
   const prForTask = getPullRequestNumberFromActiveTask(
     updatedTaskPlan ?? state.taskPlan,
   );
@@ -188,6 +209,10 @@ export async function openPullRequest(
     | GitHubPullRequestList[number]
     | GitHubPullRequestUpdate
     | null = null;
+
+  const reviewPullNumber = config.configurable?.reviewPullNumber;
+  const prBody = `${shouldCreateIssue(config) ? `Fixes #${state.githubIssueId}` : ""}${reviewPullNumber ? `\n\nTriggered from pull request: #${reviewPullNumber}` : ""}${userLogin ? `\n\nOwner: @${userLogin}` : ""}\n\n${body}`;
+
   if (!prForTask) {
     // No PR created yet. Shouldn't be possible, but we have a condition here anyway
     pullRequest = await createPullRequest({
@@ -195,17 +220,17 @@ export async function openPullRequest(
       repo,
       headBranch: branchName,
       title,
-      body: `Fixes #${state.githubIssueId}\n\n${body}`,
+      body: prBody,
       githubInstallationToken,
       baseBranch: state.targetRepository.branch,
     });
   } else {
     // Ensure the PR is ready for review
-    pullRequest = await markPullRequestReadyForReview({
+    pullRequest = await updatePullRequest({
       owner,
       repo,
       title,
-      body: `Fixes #${state.githubIssueId}\n\n${body}`,
+      body: prBody,
       pullNumber: prForTask,
       githubInstallationToken,
     });

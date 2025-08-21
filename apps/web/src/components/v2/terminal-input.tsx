@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { DEFAULT_CONFIG_KEY, useConfigStore } from "@/hooks/useConfigStore";
 import {
   API_KEY_REQUIRED_MESSAGE,
+  GITHUB_USER_LOGIN_HEADER,
   MANAGER_GRAPH_ID,
 } from "@open-swe/shared/constants";
 import { ManagerGraphUpdate } from "@open-swe/shared/open-swe/manager/types";
@@ -37,6 +38,8 @@ interface TerminalInputProps {
   setQuickActionPrompt?: Dispatch<SetStateAction<string>>;
   autoAcceptPlan: boolean;
   setAutoAcceptPlan: Dispatch<SetStateAction<boolean>>;
+  shouldCreateIssue: boolean;
+  setShouldCreateIssue: Dispatch<SetStateAction<boolean>>;
   draftToLoad?: string;
 }
 
@@ -70,6 +73,8 @@ export function TerminalInput({
   setQuickActionPrompt,
   autoAcceptPlan,
   setAutoAcceptPlan,
+  shouldCreateIssue,
+  setShouldCreateIssue,
   draftToLoad,
 }: TerminalInputProps) {
   const { push } = useRouter();
@@ -163,6 +168,8 @@ export function TerminalInput({
               recursion_limit: 400,
               configurable: {
                 ...defaultConfig,
+                shouldCreateIssue,
+                [GITHUB_USER_LOGIN_HEADER]: user.login,
               },
             },
             ifNotExists: "create",
@@ -197,6 +204,11 @@ export function TerminalInput({
         setMessage("");
         setContentBlocks([]);
         setAutoAcceptPlan(false);
+        setShouldCreateIssue(
+          defaultConfig?.shouldCreateIssue != null
+            ? !!defaultConfig.shouldCreateIssue
+            : true,
+        );
       } catch (e) {
         if (
           typeof e === "object" &&
