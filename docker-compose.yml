@@ -13,8 +13,13 @@ services:
       - API_BEARER_TOKEN=${API_BEARER_TOKEN}
       # Point to Ollama running on the host or LAN; override via env as needed
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      # Optional: point agent to a mounted repo path for local-mode editing
+      - OPEN_SWE_PROJECT_PATH=${OPEN_SWE_PROJECT_PATH:-/workspace/repo}
     ports:
       - "2024:2024"
+    volumes:
+      # Mount your project repo into /workspace/repo for agent local-mode coding
+      - ./workspace:/workspace
 
   web:
     build:
@@ -26,6 +31,9 @@ services:
       - OPEN_SWE_LOCAL_MODE=true
       - SECRETS_ENCRYPTION_KEY=${SECRETS_ENCRYPTION_KEY}
       - API_BEARER_TOKEN=${API_BEARER_TOKEN}
+      - PREVIEW_ADMIN_TOKEN=${PREVIEW_ADMIN_TOKEN}
+      - NEXT_PUBLIC_PREVIEW_ADMIN_TOKEN=${PREVIEW_ADMIN_TOKEN}
+      - KUBECONFIG_B64=${KUBECONFIG_B64}
       - NEXT_PUBLIC_API_URL=http://localhost:3000/api
     ports:
       - "3000:3000"

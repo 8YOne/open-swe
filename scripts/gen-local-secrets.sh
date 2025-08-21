@@ -10,11 +10,13 @@ echo "Generating secrets to $SECRETS_FILE"
 
 SECRETS_ENCRYPTION_KEY=$(openssl rand -hex 32)
 API_BEARER_TOKEN=$(openssl rand -hex 32)
+PREVIEW_ADMIN_TOKEN=$(openssl rand -hex 32)
 
 cat > "$SECRETS_FILE" <<EOF
 # Shared across services
 SECRETS_ENCRYPTION_KEY=$SECRETS_ENCRYPTION_KEY
 API_BEARER_TOKEN=$API_BEARER_TOKEN
+PREVIEW_ADMIN_TOKEN=$PREVIEW_ADMIN_TOKEN
 EOF
 
 echo "Wrote $SECRETS_FILE"

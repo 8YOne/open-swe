@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langgraph
+  namespace: __NAMESPACE__
+  labels:
+    app: langgraph
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langgraph
+  template:
+    metadata:
+      labels:
+        app: langgraph
+    spec:
+      initContainers:
+        - name: clone-repo
+          image: alpine/git:latest
+          env:
+            - name: GIT_REPO_URL
+              value: "__GIT_REPO_URL__"
+            - name: GIT_BRANCH
+              value: "__GIT_BRANCH__"
+            - name: GIT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: open-swe-shared-secrets
+                  key: GITHUB_PAT
+          command: ["sh","-lc"]
+          args:
+            - |
+              set -eux
+              REPO_DIR=/workspace/repo
+              if [ -d "$REPO_DIR/.git" ]; then
+                cd "$REPO_DIR"
+                git fetch origin "$GIT_BRANCH"
+                git checkout -f "$GIT_BRANCH"
+                git reset --hard "origin/$GIT_BRANCH"
+              else
+                mkdir -p "$REPO_DIR"
+                if [ -n "$GIT_TOKEN" ]; then
+                  # token-based auth for private repos
+                  AUTH_URL=$(echo "$GIT_REPO_URL" | sed -e "s#https://#https://oauth2:$GIT_TOKEN@#")
+                  git clone --depth=1 -b "$GIT_BRANCH" "$AUTH_URL" "$REPO_DIR"
+                else
+                  git clone --depth=1 -b "$GIT_BRANCH" "$GIT_REPO_URL" "$REPO_DIR"
+                fi
+              fi
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      containers:
+        - name: langgraph
+          image: __AGENT_IMAGE__
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 2024
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "2024"
+            - name: OPEN_SWE_LOCAL_MODE
+              value: "true"
+            - name: OPEN_SWE_PROJECT_PATH
+              value: "/workspace/repo"
+            - name: SECRETS_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: open-swe-shared-secrets
+                  key: SECRETS_ENCRYPTION_KEY
+            - name: API_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: open-swe-shared-secrets
+                  key: API_BEARER_TOKEN
+            - name: OLLAMA_BASE_URL
+              value: "__OLLAMA_BASE_URL__"
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      volumes:
+        - name: workspace
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langgraph
+  namespace: __NAMESPACE__
+spec:
+  type: ClusterIP
+  selector:
+    app: langgraph
+  ports:
+    - name: http
+      port: 2024
+      targetPort: 2024
+
+

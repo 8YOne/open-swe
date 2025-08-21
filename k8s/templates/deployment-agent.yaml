@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langgraph
+  namespace: __NAMESPACE__
+  labels:
+    app: langgraph
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langgraph
+  template:
+    metadata:
+      labels:
+        app: langgraph
+    spec:
+      containers:
+        - name: langgraph
+          image: __AGENT_IMAGE__
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 2024
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "2024"
+            - name: OPEN_SWE_LOCAL_MODE
+              value: "true"
+            - name: SECRETS_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: open-swe-shared-secrets
+                  key: SECRETS_ENCRYPTION_KEY
+            - name: API_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: open-swe-shared-secrets
+                  key: API_BEARER_TOKEN
+            - name: OLLAMA_BASE_URL
+              value: "__OLLAMA_BASE_URL__"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langgraph
+  namespace: __NAMESPACE__
+spec:
+  type: ClusterIP
+  selector:
+    app: langgraph
+  ports:
+    - name: http
+      port: 2024
+      targetPort: 2024
+
+

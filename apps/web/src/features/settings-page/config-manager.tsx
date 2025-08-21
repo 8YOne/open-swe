@@ -17,6 +17,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ConfigurableFieldUIMetadata } from "@open-swe/shared/configurable-metadata";
 import { GraphConfigurationMetadata } from "@open-swe/shared/open-swe/types";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /**
  * Extract configuration metadata from the GraphConfiguration Zod schema
@@ -57,6 +60,37 @@ export function ConfigManager() {
     ConfigurableFieldUIMetadata[]
   >([]);
   const [loading, setLoading] = useState(false);
+  const [project, setProject] = useState("");
+  const [branch, setBranch] = useState("");
+  const [host, setHost] = useState("");
+  const [appImage, setAppImage] = useState("");
+  const [appPort, setAppPort] = useState("3000");
+  const [busy, setBusy] = useState(false);
+
+  async function createPreview() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/k8s/previews", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ project, branch, host, appImage, appPort }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function destroyPreview() {
+    setBusy(true);
+    try {
+      const q = new URLSearchParams({ project, branch }).toString();
+      const res = await fetch(`/api/k8s/previews?${q}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const loadConfigurations = async () => {
     // TODO: If we implement a concept of users and start storing config on assistants,
@@ -237,6 +271,44 @@ export function ConfigManager() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+      <Card className="bg-card border-border shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-xl">Kubernetes Previews</CardTitle>
+          <CardDescription>Deploy and manage per-branch preview environments.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <Label>Project</Label>
+              <Input value={project} onChange={(e) => setProject(e.target.value)} placeholder="myproj" />
+            </div>
+            <div>
+              <Label>Branch</Label>
+              <Input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="feature-123" />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Preview Host</Label>
+              <Input value={host} onChange={(e) => setHost(e.target.value)} placeholder="feature-123.localdev.me" />
+            </div>
+          <div>
+            <Label>App Image</Label>
+            <Input value={appImage} onChange={(e) => setAppImage(e.target.value)} placeholder="ghcr.io/org/myapp:sha" />
+          </div>
+          <div>
+            <Label>App Port</Label>
+            <Input value={appPort} onChange={(e) => setAppPort(e.target.value)} placeholder="3000" />
+          </div>
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={createPreview} disabled={busy}>
+              {busy ? "Creating..." : "Create Preview"}
+            </Button>
+            <Button variant="destructive" onClick={destroyPreview} disabled={busy}>
+              {busy ? "Deleting..." : "Delete Preview"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

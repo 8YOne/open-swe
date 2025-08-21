@@ -11,14 +11,16 @@ import { GitHubAppProvider } from "@/providers/GitHubApp";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ProjectsManager } from "./projects-manager";
+import { PreviewsList } from "./previews-list";
 
 export default function SettingsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useQueryState("tab", {
-    defaultValue: "github" as "github" | "api-keys" | "configuration",
+    defaultValue: "github" as "github" | "api-keys" | "configuration" | "projects",
     parse: (value: string) => {
-      if (["github", "api-keys", "configuration"].includes(value)) {
-        return value as "github" | "api-keys" | "configuration";
+      if (["github", "api-keys", "configuration", "projects"].includes(value)) {
+        return value as "github" | "api-keys" | "configuration" | "projects";
       }
       return "github";
     },
@@ -72,6 +74,15 @@ export default function SettingsPage() {
               </span>
             </button>
             <button
+              onClick={() => setActiveTab("projects")}
+              className={getTabClassName(activeTab === "projects")}
+            >
+              <span className="flex items-center gap-2 font-mono">
+                <Settings className="size-4" />
+                Projects
+              </span>
+            </button>
+            <button
               onClick={() => setActiveTab("api-keys")}
               className={getTabClassName(activeTab === "api-keys")}
             >
@@ -96,6 +107,13 @@ export default function SettingsPage() {
           {activeTab === "github" && <GitHubManager />}
           {activeTab === "api-keys" && <APIKeysTab />}
           {activeTab === "configuration" && <ConfigManager />}
+          {activeTab === "projects" && (
+            <div className="space-y-6">
+              <ProjectsManager />
+              {/* @ts-expect-error: server/env var not typed client-side; admin token header is enforced by server */}
+              <PreviewsList />
+            </div>
+          )}
         </div>
       </div>
     </GitHubAppProvider>

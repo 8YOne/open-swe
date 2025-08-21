@@ -215,6 +215,29 @@ export async function openPullRequest(
   if (pullRequest) {
     // Delete the sandbox.
     sandboxDeleted = await deleteSandbox(sandboxSessionId);
+
+    // Auto-create preview if configured (best-effort, non-blocking)
+    try {
+      const adminToken = process.env.PREVIEW_ADMIN_TOKEN;
+      const apiBase = process.env.PREVIEW_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+      const projectName = `${owner}/${repo}`;
+      const body: Record<string, unknown> = {
+        projectName,
+        branch: branchName,
+        sha: "",
+      };
+      const resp = await fetch(`${apiBase}/k8s/previews/by-project`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(adminToken ? { "x-preview-admin-token": adminToken } : {}),
+        },
+        body: JSON.stringify(body),
+      }).catch(() => null);
+      logger.info("Triggered preview creation", { status: resp?.status });
+    } catch (e) {
+      logger.warn("Failed to trigger preview creation", { e: (e as Error)?.message });
+    }
   }
 
   const newMessages = [

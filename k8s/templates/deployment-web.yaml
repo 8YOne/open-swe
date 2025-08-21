@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: __NAMESPACE__
+  labels:
+    app: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: __WEB_IMAGE__
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: LANGGRAPH_API_URL
+              value: "http://langgraph:2024"
+            - name: OPEN_SWE_LOCAL_MODE
+              value: "true"
+            - name: SECRETS_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: open-swe-shared-secrets
+                  key: SECRETS_ENCRYPTION_KEY
+            - name: API_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: open-swe-shared-secrets
+                  key: API_BEARER_TOKEN
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: __NAMESPACE__
+spec:
+  type: ClusterIP
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+
+
