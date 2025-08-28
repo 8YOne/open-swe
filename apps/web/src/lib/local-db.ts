@@ -1,3 +1,4 @@
+import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -19,98 +20,42 @@ function findProjectRoot(): string {
 }
 
 const PROJECT_ROOT = findProjectRoot();
-const DEFAULT_DB_PATH = path.join(PROJECT_ROOT, '.data/local_auth.json');
+const DEFAULT_DB_PATH = path.join(PROJECT_ROOT, '.data/local_auth.sqlite');
 const DB_PATH = process.env.LOCAL_AUTH_DB_PATH || DEFAULT_DB_PATH;
 
-interface Database {
-  users: LocalUser[];
-  projects: Project[];
-  nextUserId: number;
-  nextProjectId: number;
-}
+let db: Database.Database | null = null;
 
-let db: Database | null = null;
-
-function init(): Database {
+function init(): Database.Database {
   if (db) return db;
   
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  db = new Database(DB_PATH);
   
-  // Check for existing SQLite database and migrate if needed
-  const sqlitePath = DB_PATH.replace('.json', '.sqlite');
-  if (fs.existsSync(sqlitePath) && !fs.existsSync(DB_PATH)) {
-    console.log('Migrating from SQLite to JSON database...');
-    try {
-      db = migrateSqliteToJson(sqlitePath);
-      persist();
-      console.log('Migration completed successfully');
-    } catch (error) {
-      console.warn('Failed to migrate SQLite database, creating new one:', error);
-      db = createEmptyDatabase();
-    }
-  } else if (fs.existsSync(DB_PATH)) {
-    try {
-      const data = fs.readFileSync(DB_PATH, 'utf8');
-      db = JSON.parse(data);
-      
-      // Ensure the database has the expected structure
-      if (!db || typeof db !== 'object') {
-        throw new Error('Invalid database format');
-      }
-      
-      db.users = db.users || [];
-      db.projects = db.projects || [];
-      db.nextUserId = db.nextUserId || 1;
-      db.nextProjectId = db.nextProjectId || 1;
-      
-      // Migrate any users without IDs
-      db.users.forEach((user, index) => {
-        if (!user.id) {
-          user.id = db!.nextUserId++;
-        }
-      });
-      
-      // Fix nextUserId if needed
-      if (db.users.length > 0) {
-        const maxId = Math.max(...db.users.map(u => u.id));
-        db.nextUserId = Math.max(db.nextUserId, maxId + 1);
-      }
-      
-    } catch (error) {
-      console.warn('Failed to read database file, creating new one:', error);
-      db = createEmptyDatabase();
-    }
-  } else {
-    db = createEmptyDatabase();
-  }
-  
-  persist();
-  return db;
-}
-
-function migrateSqliteToJson(sqlitePath: string): Database {
-  // For now, just create an empty database
-  // In a real migration, we would read the SQLite file and convert the data
-  console.log('SQLite migration not implemented, creating empty database');
-  return createEmptyDatabase();
-}
-
-function createEmptyDatabase(): Database {
-  return {
-    users: [],
-    projects: [],
-    nextUserId: 1,
-    nextProjectId: 1,
-  };
-}
-
-function persist() {
-  if (!db) return;
+  db.exec(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    name TEXT,
+    email TEXT,
+    role TEXT DEFAULT 'user'
+  )`);
+  // Backfill role column if missing
   try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-  } catch (error) {
-    console.error('Failed to persist database:', error);
+    db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
+  } catch {
+    // Column already exists, ignore error
   }
+  db.exec(`CREATE TABLE IF NOT EXISTS projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    repo_url TEXT,
+    host_pattern TEXT,
+    app_port INTEGER,
+    image_template TEXT,
+    env_json TEXT,
+    secrets_json TEXT
+  )`);
+  return db;
 }
 
 export type LocalUser = {
@@ -124,7 +69,8 @@ export type LocalUser = {
 
 export async function getUserByUsername(username: string): Promise<LocalUser | null> {
   const database = init();
-  const user = database.users.find(u => u.username === username);
+  const stmt = database.prepare("SELECT * FROM users WHERE username = ?");
+  const user = stmt.get(username) as LocalUser | undefined;
   return user || null;
 }
 
@@ -136,33 +82,16 @@ export async function createUser(
   role: string = "user",
 ): Promise<void> {
   const database = init();
-  
-  // Check if user already exists
-  const existing = database.users.find(u => u.username === username);
-  if (existing) {
-    throw new Error('User already exists');
-  }
-  
-  const newUser: LocalUser = {
-    id: database.nextUserId++,
-    username,
-    password_hash,
-    name: name || null,
-    email: email || null,
-    role,
-  };
-  
-  database.users.push(newUser);
-  persist();
+  const stmt = database.prepare(
+    "INSERT INTO users (username, password_hash, name, email, role) VALUES (?, ?, ?, ?, ?)"
+  );
+  stmt.run(username, password_hash, name, email, role);
 }
 
 export async function setUserRole(username: string, role: string): Promise<void> {
   const database = init();
-  const user = database.users.find(u => u.username === username);
-  if (user) {
-    user.role = role;
-    persist();
-  }
+  const stmt = database.prepare("UPDATE users SET role = ? WHERE username = ?");
+  stmt.run(role, username);
 }
 
 export type Project = {
@@ -178,75 +107,93 @@ export type Project = {
 
 export async function listProjects(): Promise<Project[]> {
   const database = init();
-  return [...database.projects].sort((a, b) => b.id - a.id);
+  const stmt = database.prepare("SELECT * FROM projects ORDER BY id DESC");
+  return stmt.all() as Project[];
 }
 
 export async function getProject(id: number): Promise<Project | null> {
   const database = init();
-  const project = database.projects.find(p => p.id === id);
+  const stmt = database.prepare("SELECT * FROM projects WHERE id = ?");
+  const project = stmt.get(id) as Project | undefined;
   return project || null;
 }
 
 export async function findProjectByName(name: string): Promise<Project | null> {
   const database = init();
-  const project = database.projects.find(p => p.name === name);
+  const stmt = database.prepare("SELECT * FROM projects WHERE name = ?");
+  const project = stmt.get(name) as Project | undefined;
   return project || null;
 }
 
 export async function findProjectByRepoUrl(repoUrl: string): Promise<Project | null> {
   const database = init();
-  const project = database.projects.find(p => p.repo_url === repoUrl);
+  const stmt = database.prepare("SELECT * FROM projects WHERE repo_url = ?");
+  const project = stmt.get(repoUrl) as Project | undefined;
   return project || null;
 }
 
 export async function createProject(input: Omit<Project, "id">): Promise<number> {
   const database = init();
-  
-  // Check if project with same name already exists
-  const existing = database.projects.find(p => p.name === input.name);
-  if (existing) {
-    throw new Error('Project with this name already exists');
-  }
-  
-  const newProject: Project = {
-    id: database.nextProjectId++,
-    name: input.name,
-    repo_url: input.repo_url || null,
-    host_pattern: input.host_pattern || null,
-    app_port: input.app_port || null,
-    image_template: input.image_template || null,
-    env_json: input.env_json || null,
-    secrets_json: input.secrets_json || null,
-  };
-  
-  database.projects.push(newProject);
-  persist();
-  return newProject.id;
+  const stmt = database.prepare(`
+    INSERT INTO projects (name, repo_url, host_pattern, app_port, image_template, env_json, secrets_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const result = stmt.run(
+    input.name,
+    input.repo_url,
+    input.host_pattern,
+    input.app_port,
+    input.image_template,
+    input.env_json,
+    input.secrets_json
+  );
+  return result.lastInsertRowid as number;
 }
 
 export async function updateProject(id: number, input: Partial<Omit<Project, "id">>): Promise<void> {
   const database = init();
-  const project = database.projects.find(p => p.id === id);
-  if (!project) return;
   
-  // Update only provided fields
-  if (input.name !== undefined) project.name = input.name;
-  if (input.repo_url !== undefined) project.repo_url = input.repo_url;
-  if (input.host_pattern !== undefined) project.host_pattern = input.host_pattern;
-  if (input.app_port !== undefined) project.app_port = input.app_port;
-  if (input.image_template !== undefined) project.image_template = input.image_template;
-  if (input.env_json !== undefined) project.env_json = input.env_json;
-  if (input.secrets_json !== undefined) project.secrets_json = input.secrets_json;
+  const fields: string[] = [];
+  const values: any[] = [];
   
-  persist();
+  if (input.name !== undefined) {
+    fields.push("name = ?");
+    values.push(input.name);
+  }
+  if (input.repo_url !== undefined) {
+    fields.push("repo_url = ?");
+    values.push(input.repo_url);
+  }
+  if (input.host_pattern !== undefined) {
+    fields.push("host_pattern = ?");
+    values.push(input.host_pattern);
+  }
+  if (input.app_port !== undefined) {
+    fields.push("app_port = ?");
+    values.push(input.app_port);
+  }
+  if (input.image_template !== undefined) {
+    fields.push("image_template = ?");
+    values.push(input.image_template);
+  }
+  if (input.env_json !== undefined) {
+    fields.push("env_json = ?");
+    values.push(input.env_json);
+  }
+  if (input.secrets_json !== undefined) {
+    fields.push("secrets_json = ?");
+    values.push(input.secrets_json);
+  }
+  
+  if (fields.length === 0) return;
+  
+  values.push(id);
+  const stmt = database.prepare(`UPDATE projects SET ${fields.join(", ")} WHERE id = ?`);
+  stmt.run(...values);
 }
 
 export async function deleteProject(id: number): Promise<void> {
   const database = init();
-  const index = database.projects.findIndex(p => p.id === id);
-  if (index !== -1) {
-    database.projects.splice(index, 1);
-    persist();
-  }
+  const stmt = database.prepare("DELETE FROM projects WHERE id = ?");
+  stmt.run(id);
 }
-

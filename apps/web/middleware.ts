@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   GITHUB_TOKEN_COOKIE,
   GITHUB_INSTALLATION_ID_COOKIE,
-} from "@open-swe/shared/constants";
-import { verifyGithubUser } from "@open-swe/shared/github/verify-user";
+} from "@openswe/shared/constants";
+import { verifyGithubUser } from "@openswe/shared/github/verify-user";
 import jwt from "jsonwebtoken";
 
 async function isAuthenticated(request: NextRequest): Promise<boolean> {

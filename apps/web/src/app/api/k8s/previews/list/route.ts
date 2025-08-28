@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
           item.url = url;
         }
       } catch {
-        // Ignore errors when trying to set URL for preview
+        // Failed to find project or process host pattern, ignore error
       }
     }
   }
