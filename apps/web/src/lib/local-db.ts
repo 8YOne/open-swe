@@ -26,7 +26,9 @@ async function init(): Promise<any> {
   // Backfill role column if missing
   try {
     db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
-  } catch {}
+  } catch {
+    // Column already exists, ignore error
+  }
   db.run(`CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,

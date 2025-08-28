@@ -54,7 +54,9 @@ export async function GET(req: NextRequest) {
           if (!url.startsWith("http")) url = `http://${url}`;
           item.url = url;
         }
-      } catch {}
+      } catch {
+        // Failed to find project or process host pattern, ignore error
+      }
     }
   }
   return NextResponse.json(out);

@@ -20,6 +20,7 @@
     "clean": "rm -rf .turbo .next || true && rm next-env.d.ts || true"
   },
   "dependencies": {
+    "@kubernetes/client-node": "^0.22.3",
     "@langchain/core": "^0.3.65",
     "@langchain/langgraph": "^0.3.8",
     "@langchain/langgraph-sdk": "^0.0.95",
@@ -71,8 +72,7 @@
     "use-stick-to-bottom": "^1.0.46",
     "uuid": "^11.1.0",
     "zod": "^3.25.32",
-    "zustand": "^5.0.5",
-    "@kubernetes/client-node": "^0.22.3"
+    "zustand": "^5.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
