@@ -43,7 +43,11 @@ export async function POST(request: NextRequest) {
     });
     return response;
   } catch (error) {
-    return NextResponse.json({ error: "Login failed" }, { status: 500 });
+    console.error("Login error:", error);
+    return NextResponse.json({ 
+      error: "Login failed", 
+      details: process.env.NODE_ENV === "development" ? String(error) : undefined 
+    }, { status: 500 });
   }
 }
 

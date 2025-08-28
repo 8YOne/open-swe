@@ -6,6 +6,9 @@ COPY apps ./apps
 COPY packages ./packages
 RUN corepack enable && yarn install --immutable
 
+# Build shared packages first
+RUN yarn workspace @open-swe/shared build
+
 FROM node:24-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app /app
@@ -18,10 +21,14 @@ WORKDIR /app
 ENV NODE_ENV=production
 EXPOSE 3000
 
+# Enable corepack for yarn management
+RUN corepack enable
+
 # Copy only the built web app output and needed files
 COPY --from=deps /app/package.json /app/yarn.lock /app/.yarnrc.yml ./
 COPY --from=deps /app/apps/web/package.json ./apps/web/package.json
 COPY --from=deps /app/packages ./packages
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/apps/web/.next ./apps/web/.next
 COPY --from=builder /app/apps/web/public ./apps/web/public
 

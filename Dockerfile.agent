@@ -16,6 +16,9 @@ COPY langgraph.json ./
 RUN corepack enable \
  && yarn install --immutable
 
+# Build shared packages first
+RUN yarn workspace @open-swe/shared build
+
 EXPOSE 2024
 
 ENV NODE_ENV=production

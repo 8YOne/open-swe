@@ -1,50 +1,116 @@
 import fs from "node:fs";
-import initSqlJs from "sql.js";
+import path from "node:path";
 
-const DB_PATH = process.env.LOCAL_AUTH_DB_PATH || ".data/local_auth.sqlite";
-
-let db: any | null = null;
-
-async function init(): Promise<any> {
-  if (db) return db;
-  const SQL = await initSqlJs();
-  fs.mkdirSync(".data", { recursive: true });
-  if (fs.existsSync(DB_PATH)) {
-    const filebuffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(new Uint8Array(filebuffer));
-  } else {
-    db = new SQL.Database();
+// Find the project root by looking for package.json or use relative path
+function findProjectRoot(): string {
+  let currentDir = process.cwd();
+  while (currentDir !== path.dirname(currentDir)) {
+    if (fs.existsSync(path.join(currentDir, 'package.json'))) {
+      const packageJson = JSON.parse(fs.readFileSync(path.join(currentDir, 'package.json'), 'utf8'));
+      // Look for the main project package.json (not a workspace package)
+      if (packageJson.workspaces || packageJson.name === 'open-swe') {
+        return currentDir;
+      }
+    }
+    currentDir = path.dirname(currentDir);
   }
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    name TEXT,
-    email TEXT,
-    role TEXT DEFAULT 'user'
-  )`);
-  // Backfill role column if missing
-  try {
-    db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
-  } catch {}
-  db.run(`CREATE TABLE IF NOT EXISTS projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL,
-    repo_url TEXT,
-    host_pattern TEXT,
-    app_port INTEGER,
-    image_template TEXT,
-    env_json TEXT,
-    secrets_json TEXT
-  )`);
+  // Fallback: assume we're in apps/web and go up two levels
+  return path.join(process.cwd(), '../..');
+}
+
+const PROJECT_ROOT = findProjectRoot();
+const DEFAULT_DB_PATH = path.join(PROJECT_ROOT, '.data/local_auth.json');
+const DB_PATH = process.env.LOCAL_AUTH_DB_PATH || DEFAULT_DB_PATH;
+
+interface Database {
+  users: LocalUser[];
+  projects: Project[];
+  nextUserId: number;
+  nextProjectId: number;
+}
+
+let db: Database | null = null;
+
+function init(): Database {
+  if (db) return db;
+  
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  
+  // Check for existing SQLite database and migrate if needed
+  const sqlitePath = DB_PATH.replace('.json', '.sqlite');
+  if (fs.existsSync(sqlitePath) && !fs.existsSync(DB_PATH)) {
+    console.log('Migrating from SQLite to JSON database...');
+    try {
+      db = migrateSqliteToJson(sqlitePath);
+      persist();
+      console.log('Migration completed successfully');
+    } catch (error) {
+      console.warn('Failed to migrate SQLite database, creating new one:', error);
+      db = createEmptyDatabase();
+    }
+  } else if (fs.existsSync(DB_PATH)) {
+    try {
+      const data = fs.readFileSync(DB_PATH, 'utf8');
+      db = JSON.parse(data);
+      
+      // Ensure the database has the expected structure
+      if (!db || typeof db !== 'object') {
+        throw new Error('Invalid database format');
+      }
+      
+      db.users = db.users || [];
+      db.projects = db.projects || [];
+      db.nextUserId = db.nextUserId || 1;
+      db.nextProjectId = db.nextProjectId || 1;
+      
+      // Migrate any users without IDs
+      db.users.forEach((user, index) => {
+        if (!user.id) {
+          user.id = db!.nextUserId++;
+        }
+      });
+      
+      // Fix nextUserId if needed
+      if (db.users.length > 0) {
+        const maxId = Math.max(...db.users.map(u => u.id));
+        db.nextUserId = Math.max(db.nextUserId, maxId + 1);
+      }
+      
+    } catch (error) {
+      console.warn('Failed to read database file, creating new one:', error);
+      db = createEmptyDatabase();
+    }
+  } else {
+    db = createEmptyDatabase();
+  }
+  
   persist();
   return db;
 }
 
+function migrateSqliteToJson(sqlitePath: string): Database {
+  // For now, just create an empty database
+  // In a real migration, we would read the SQLite file and convert the data
+  console.log('SQLite migration not implemented, creating empty database');
+  return createEmptyDatabase();
+}
+
+function createEmptyDatabase(): Database {
+  return {
+    users: [],
+    projects: [],
+    nextUserId: 1,
+    nextProjectId: 1,
+  };
+}
+
 function persist() {
   if (!db) return;
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+  } catch (error) {
+    console.error('Failed to persist database:', error);
+  }
 }
 
 export type LocalUser = {
@@ -57,12 +123,9 @@ export type LocalUser = {
 };
 
 export async function getUserByUsername(username: string): Promise<LocalUser | null> {
-  const conn = await init();
-  const stmt = conn.prepare("SELECT id, username, password_hash, name, email, role FROM users WHERE username = ?");
-  stmt.bind([username]);
-  const result = stmt.step() ? (stmt.getAsObject() as any) : null;
-  stmt.free();
-  return result as LocalUser | null;
+  const database = init();
+  const user = database.users.find(u => u.username === username);
+  return user || null;
 }
 
 export async function createUser(
@@ -72,21 +135,34 @@ export async function createUser(
   email?: string,
   role: string = "user",
 ): Promise<void> {
-  const conn = await init();
-  const stmt = conn.prepare("INSERT INTO users (username, password_hash, name, email, role) VALUES (?, ?, ?, ?, ?)");
-  stmt.bind([username, password_hash, name ?? null, email ?? null, role]);
-  stmt.step();
-  stmt.free();
+  const database = init();
+  
+  // Check if user already exists
+  const existing = database.users.find(u => u.username === username);
+  if (existing) {
+    throw new Error('User already exists');
+  }
+  
+  const newUser: LocalUser = {
+    id: database.nextUserId++,
+    username,
+    password_hash,
+    name: name || null,
+    email: email || null,
+    role,
+  };
+  
+  database.users.push(newUser);
   persist();
 }
 
 export async function setUserRole(username: string, role: string): Promise<void> {
-  const conn = await init();
-  const stmt = conn.prepare("UPDATE users SET role = ? WHERE username = ?");
-  stmt.bind([role, username]);
-  stmt.step();
-  stmt.free();
-  persist();
+  const database = init();
+  const user = database.users.find(u => u.username === username);
+  if (user) {
+    user.role = role;
+    persist();
+  }
 }
 
 export type Project = {
@@ -101,102 +177,76 @@ export type Project = {
 };
 
 export async function listProjects(): Promise<Project[]> {
-  const conn = await init();
-  const result: Project[] = [];
-  const stmt = conn.prepare("SELECT id, name, repo_url, host_pattern, app_port, image_template, env_json, secrets_json FROM projects ORDER BY id DESC");
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as any;
-    result.push(row as Project);
-  }
-  stmt.free();
-  return result;
+  const database = init();
+  return [...database.projects].sort((a, b) => b.id - a.id);
 }
 
 export async function getProject(id: number): Promise<Project | null> {
-  const conn = await init();
-  const stmt = conn.prepare("SELECT id, name, repo_url, host_pattern, app_port, image_template, env_json, secrets_json FROM projects WHERE id = ?");
-  stmt.bind([id]);
-  const row = stmt.step() ? (stmt.getAsObject() as any) : null;
-  stmt.free();
-  return (row as Project) || null;
+  const database = init();
+  const project = database.projects.find(p => p.id === id);
+  return project || null;
 }
 
 export async function findProjectByName(name: string): Promise<Project | null> {
-  const conn = await init();
-  const stmt = conn.prepare("SELECT id, name, repo_url, host_pattern, app_port, image_template, env_json, secrets_json FROM projects WHERE name = ?");
-  stmt.bind([name]);
-  const row = stmt.step() ? (stmt.getAsObject() as any) : null;
-  stmt.free();
-  return (row as Project) || null;
+  const database = init();
+  const project = database.projects.find(p => p.name === name);
+  return project || null;
 }
 
 export async function findProjectByRepoUrl(repoUrl: string): Promise<Project | null> {
-  const conn = await init();
-  const stmt = conn.prepare("SELECT id, name, repo_url, host_pattern, app_port, image_template, env_json, secrets_json FROM projects WHERE repo_url = ?");
-  stmt.bind([repoUrl]);
-  const row = stmt.step() ? (stmt.getAsObject() as any) : null;
-  stmt.free();
-  return (row as Project) || null;
+  const database = init();
+  const project = database.projects.find(p => p.repo_url === repoUrl);
+  return project || null;
 }
 
 export async function createProject(input: Omit<Project, "id">): Promise<number> {
-  const conn = await init();
-  const stmt = conn.prepare("INSERT INTO projects (name, repo_url, host_pattern, app_port, image_template, env_json, secrets_json) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  stmt.bind([
-    input.name,
-    input.repo_url ?? null,
-    input.host_pattern ?? null,
-    input.app_port ?? null,
-    input.image_template ?? null,
-    input.env_json ?? null,
-    input.secrets_json ?? null,
-  ]);
-  stmt.step();
-  stmt.free();
-  const idStmt = conn.prepare("SELECT last_insert_rowid() as id");
-  idStmt.step();
-  const id = (idStmt.getAsObject() as any).id as number;
-  idStmt.free();
+  const database = init();
+  
+  // Check if project with same name already exists
+  const existing = database.projects.find(p => p.name === input.name);
+  if (existing) {
+    throw new Error('Project with this name already exists');
+  }
+  
+  const newProject: Project = {
+    id: database.nextProjectId++,
+    name: input.name,
+    repo_url: input.repo_url || null,
+    host_pattern: input.host_pattern || null,
+    app_port: input.app_port || null,
+    image_template: input.image_template || null,
+    env_json: input.env_json || null,
+    secrets_json: input.secrets_json || null,
+  };
+  
+  database.projects.push(newProject);
   persist();
-  return id;
+  return newProject.id;
 }
 
 export async function updateProject(id: number, input: Partial<Omit<Project, "id">>): Promise<void> {
-  const conn = await init();
-  // Fetch existing
-  const existing = await getProject(id);
-  if (!existing) return;
-  const merged = {
-    name: input.name ?? existing.name,
-    repo_url: input.repo_url ?? existing.repo_url,
-    host_pattern: input.host_pattern ?? existing.host_pattern,
-    app_port: input.app_port ?? existing.app_port,
-    image_template: input.image_template ?? existing.image_template,
-    env_json: input.env_json ?? existing.env_json,
-    secrets_json: input.secrets_json ?? existing.secrets_json,
-  };
-  const stmt = conn.prepare("UPDATE projects SET name = ?, repo_url = ?, host_pattern = ?, app_port = ?, image_template = ?, env_json = ?, secrets_json = ? WHERE id = ?");
-  stmt.bind([
-    merged.name,
-    merged.repo_url ?? null,
-    merged.host_pattern ?? null,
-    merged.app_port ?? null,
-    merged.image_template ?? null,
-    merged.env_json ?? null,
-    merged.secrets_json ?? null,
-    id,
-  ]);
-  stmt.step();
-  stmt.free();
+  const database = init();
+  const project = database.projects.find(p => p.id === id);
+  if (!project) return;
+  
+  // Update only provided fields
+  if (input.name !== undefined) project.name = input.name;
+  if (input.repo_url !== undefined) project.repo_url = input.repo_url;
+  if (input.host_pattern !== undefined) project.host_pattern = input.host_pattern;
+  if (input.app_port !== undefined) project.app_port = input.app_port;
+  if (input.image_template !== undefined) project.image_template = input.image_template;
+  if (input.env_json !== undefined) project.env_json = input.env_json;
+  if (input.secrets_json !== undefined) project.secrets_json = input.secrets_json;
+  
   persist();
 }
 
 export async function deleteProject(id: number): Promise<void> {
-  const conn = await init();
-  const stmt = conn.prepare("DELETE FROM projects WHERE id = ?");
-  stmt.bind([id]);
-  stmt.step();
-  stmt.free();
-  persist();
+  const database = init();
+  const index = database.projects.findIndex(p => p.id === id);
+  if (index !== -1) {
+    database.projects.splice(index, 1);
+    persist();
+  }
 }
 

@@ -51,7 +51,7 @@ spec:
     app: web
   ports:
     - name: http
-      port: 3000
+      port: 7474
       targetPort: 3000
 
 

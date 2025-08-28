@@ -54,7 +54,9 @@ export async function GET(req: NextRequest) {
           if (!url.startsWith("http")) url = `http://${url}`;
           item.url = url;
         }
-      } catch {}
+      } catch {
+        // Ignore errors when trying to set URL for preview
+      }
     }
   }
   return NextResponse.json(out);

@@ -4,18 +4,8 @@ import bcrypt from "bcryptjs";
 import { createUser, getUserByUsername, setUserRole } from "@/lib/local-db";
 
 export async function POST(req: NextRequest) {
-  const { username, password, name, email, role } = await req.json();
-  if (!username || !password) {
-    return NextResponse.json({ error: "Missing username or password" }, { status: 400 });
-  }
-  const existing = await getUserByUsername(username);
-  if (existing) return NextResponse.json({ error: "User exists" }, { status: 400 });
-  const hash = await bcrypt.hash(password, 10);
-  await createUser(username, hash, name, email, role === "admin" ? "admin" : "user");
-  const token = jwt.sign({ username, name, email, role: role === "admin" ? "admin" : "user" }, process.env.LOCAL_AUTH_JWT_SECRET || "dev_local_secret_change_me", { expiresIn: "30d" });
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set("local_auth_token", token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-  return res;
+  // Registration is disabled - use CLI scripts to create users
+  return NextResponse.json({ error: "Registration is disabled. Use CLI scripts to create users." }, { status: 403 });
 }
 
 export async function PUT(req: NextRequest) {

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const env = p.env_json ? JSON.parse(p.env_json) : undefined;
   const secrets = p.secrets_json ? JSON.parse(p.secrets_json) : undefined;
   // Proxy to the generic previews endpoint
-  const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"}/k8s/previews`, {
+  const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:7474/api"}/k8s/previews`, {
     method: "POST",
     headers: {
       "content-type": "application/json",

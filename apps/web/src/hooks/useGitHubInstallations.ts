@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { GITHUB_INSTALLATION_ID_COOKIE } from "@open-swe/shared/constants";
 import { getCookie } from "@/lib/utils";
 import { Endpoints } from "@octokit/types";
+import { useAuth } from "./useAuth";
 
 type GitHubInstallationsResponse =
   Endpoints["GET /user/installations"]["response"]["data"];
@@ -66,8 +67,10 @@ const transformInstallation = (
  * Hook for managing GitHub App installations
  * Fetches installation data from the API endpoint and reads current installation ID from cookies
  * Provides functions to switch between installations
+ * Only runs when user is authenticated via GitHub
  */
 export function useGitHubInstallations(): UseGitHubInstallationsReturn {
+  const { isGitHubAuth, isLoading: authLoading } = useAuth();
   const [installations, setInstallations] = useState<Installation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +85,15 @@ export function useGitHubInstallations(): UseGitHubInstallationsReturn {
 
   // Fetch installations from API
   const fetchInstallations = useCallback(async () => {
+    // Only fetch if user is authenticated via GitHub
+    if (!isGitHubAuth) {
+      setInstallations([]);
+      setCurrentInstallationId(null);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
@@ -111,7 +123,7 @@ export function useGitHubInstallations(): UseGitHubInstallationsReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [getCurrentInstallationId]);
+  }, [isGitHubAuth, getCurrentInstallationId]);
 
   // Switch installation function - now uses API endpoint
   const switchInstallation = useCallback(async (installationId: string) => {
@@ -162,10 +174,12 @@ export function useGitHubInstallations(): UseGitHubInstallationsReturn {
     setCurrentInstallationId(cookieInstallationId);
   }, [getCurrentInstallationId]);
 
-  // Initial fetch on mount
+  // Initial fetch on mount - wait for auth to be determined
   useEffect(() => {
-    fetchInstallations();
-  }, [fetchInstallations]);
+    if (!authLoading) {
+      fetchInstallations();
+    }
+  }, [fetchInstallations, authLoading]);
 
   // Refresh installations function
   const refreshInstallations = useCallback(async () => {

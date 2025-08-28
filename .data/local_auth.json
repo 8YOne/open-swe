@@ -1,0 +1,23 @@
+{
+  "users": [
+    {
+      "id": 2,
+      "username": "undeadghost",
+      "password_hash": "$2a$10$keM3XFU5UJ2SDQ5fCvAkSe01uhNyy3JM3K4AMbZlsNQ9l0kU7pYja",
+      "name": null,
+      "email": null,
+      "role": "admin"
+    },
+    {
+      "id": 6,
+      "username": "admin",
+      "password_hash": "$2a$10$OfXYp.jxhkTeYg3Km0OAqeyUW.jBwpfliNy5f3V89xVMnzMdLOuRG",
+      "name": "Admin User",
+      "email": "admin@test.com",
+      "role": "admin"
+    }
+  ],
+  "projects": [],
+  "nextUserId": 7,
+  "nextProjectId": 1
+}

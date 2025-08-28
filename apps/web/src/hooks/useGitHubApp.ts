@@ -12,6 +12,7 @@ import {
   useGitHubInstallations,
   type Installation,
 } from "@/hooks/useGitHubInstallations";
+import { useAuth } from "./useAuth";
 
 const GITHUB_SELECTED_REPO_KEY = "selected-repository";
 
@@ -100,6 +101,8 @@ interface UseGitHubAppReturn {
 }
 
 export function useGitHubApp(): UseGitHubAppReturn {
+  const { isGitHubAuth, isLoading: authLoading } = useAuth();
+  
   // Use the centralized installation state
   const {
     currentInstallationId,
@@ -197,6 +200,16 @@ export function useGitHubApp(): UseGitHubAppReturn {
     page: number = 1,
     append: boolean = false,
   ) => {
+    // Only check installation if user is authenticated via GitHub
+    if (!isGitHubAuth) {
+      setRepositories([]);
+      setIsInstalled(false);
+      setError(null);
+      setIsLoading(false);
+      setRepositoriesLoadingMore(false);
+      return;
+    }
+
     if (!append) setIsLoading(true);
     if (append) setRepositoriesLoadingMore(true);
     setError(null);
@@ -330,32 +343,34 @@ export function useGitHubApp(): UseGitHubAppReturn {
     [selectedRepository?.owner, selectedRepository?.repo],
   );
 
-  // Refresh repositories when installation changes
+  // Refresh repositories when installation changes - wait for auth to be determined
   useEffect(() => {
-    if (currentInstallationId) {
-      const previousInstallationId = previousInstallationIdRef.current;
+    if (!authLoading) {
+      if (currentInstallationId && isGitHubAuth) {
+        const previousInstallationId = previousInstallationIdRef.current;
 
-      // Only clear repository if installation actually changed to a different value
-      if (
-        previousInstallationId !== null &&
-        previousInstallationId !== currentInstallationId
-      ) {
-        // Clear selected repository and branches when installation changes
-        setSelectedRepository(null);
-        setBranches([]);
-        setRepositoriesPage(1);
-        setRepositoriesHasMore(false);
+        // Only clear repository if installation actually changed to a different value
+        if (
+          previousInstallationId !== null &&
+          previousInstallationId !== currentInstallationId
+        ) {
+          // Clear selected repository and branches when installation changes
+          setSelectedRepository(null);
+          setBranches([]);
+          setRepositoriesPage(1);
+          setRepositoriesHasMore(false);
 
-        // Reset auto-selection flags so they can run again for the new installation
-        hasAutoSelectedRef.current = false;
-        hasCheckedLocalStorageRef.current = false;
+          // Reset auto-selection flags so they can run again for the new installation
+          hasAutoSelectedRef.current = false;
+          hasCheckedLocalStorageRef.current = false;
+        }
+
+        previousInstallationIdRef.current = currentInstallationId;
       }
 
-      previousInstallationIdRef.current = currentInstallationId;
+      checkInstallation();
     }
-
-    checkInstallation();
-  }, [currentInstallationId]);
+  }, [currentInstallationId, authLoading, isGitHubAuth]);
 
   useEffect(() => {
     if (

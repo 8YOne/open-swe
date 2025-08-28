@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const c = core();
   const pods = await c.listNamespacedPod(ns);
   const statuses = (pods.body.items || []).map((p: any) => ({ name: p.metadata?.name, phase: p.status?.phase, conditions: p.status?.conditions }));
-  const allReady = statuses.every((s) => s.phase === "Running");
+  const allReady = statuses.every((s: any) => s.phase === "Running");
   return NextResponse.json({ ok: allReady, pods: statuses });
 }
 

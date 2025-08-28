@@ -66,21 +66,8 @@ function AuthStatusContent() {
     window.location.href = "/api/auth/github/login";
   };
 
-  const handleLocalLogin = async () => {
-    setIsLoading(true);
-    const username = prompt("Username");
-    const password = prompt("Password");
-    if (!username || !password) {
-      setIsLoading(false);
-      return;
-    }
-    const res = await fetch("/api/auth/local/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    setIsLoading(false);
-    if (res.ok) router.push("/chat");
+  const handleLocalLogin = () => {
+    router.push("/login");
   };
 
   const handleInstallGitHubApp = () => {

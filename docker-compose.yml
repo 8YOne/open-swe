@@ -1,5 +1,4 @@
-version: "3.9"
-
+version: '3.8'
 services:
   langgraph:
     build:
@@ -34,9 +33,9 @@ services:
       - PREVIEW_ADMIN_TOKEN=${PREVIEW_ADMIN_TOKEN}
       - NEXT_PUBLIC_PREVIEW_ADMIN_TOKEN=${PREVIEW_ADMIN_TOKEN}
       - KUBECONFIG_B64=${KUBECONFIG_B64}
-      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
+      - NEXT_PUBLIC_API_URL=http://localhost:7474/api
     ports:
-      - "3000:3000"
+      - "7474:3000"
     depends_on:
       - langgraph
 

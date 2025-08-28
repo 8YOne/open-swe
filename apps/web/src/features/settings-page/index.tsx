@@ -110,7 +110,6 @@ export default function SettingsPage() {
           {activeTab === "projects" && (
             <div className="space-y-6">
               <ProjectsManager />
-              {/* @ts-expect-error: server/env var not typed client-side; admin token header is enforced by server */}
               <PreviewsList />
             </div>
           )}
